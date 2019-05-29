@@ -1,5 +1,5 @@
 /* Extended Module Player
- * Copyright (C) 1996-2018 Claudio Matsuoka and Hipolito Carraro Jr
+ * Copyright (C) 1996-2019 Claudio Matsuoka and Hipolito Carraro Jr
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -28,11 +28,13 @@
  * - Noisetracker N.T. and M&K! (not tested)
  * - Fast Tracker 6CHN and 8CHN
  * - Fasttracker II/Take Tracker ?CHN and ??CH
+ * - (unknown) ???C
  * - Mod's Grave M.K. w/ 8 channels (WOW)
  * - Atari Octalyser CD61 and CD81
  * - Digital Tracker FA04, FA06 and FA08
- * - TakeTracker TDZ4
+ * - TakeTracker TDZ1, TDZ4, TDZ3, and TDZ4
  * - (unknown) NSMS
+ * - (unknown) LARD
  */
 
 #include <ctype.h>
@@ -70,17 +72,22 @@ struct mod_magic {
 const struct mod_magic mod_magic[] = {
 	{"M.K.", 0, TRACKER_PROTRACKER, 4},
 	{"M!K!", 1, TRACKER_PROTRACKER, 4},
+	{"PATT", 1, TRACKER_PROTRACKER, 4},
 	{"M&K!", 1, TRACKER_NOISETRACKER, 4},
 	{"N.T.", 1, TRACKER_NOISETRACKER, 4},
 	{"6CHN", 0, TRACKER_FASTTRACKER, 6},
 	{"8CHN", 0, TRACKER_FASTTRACKER, 8},
 	{"CD61", 1, TRACKER_OCTALYSER, 6},	/* Atari STe/Falcon */
 	{"CD81", 1, TRACKER_OCTALYSER, 8},	/* Atari STe/Falcon */
+	{"TDZ1", 1, TRACKER_TAKETRACKER, 1},	/* see XModule SaveTracker.c */
+	{"TDZ2", 1, TRACKER_TAKETRACKER, 2},	/* see XModule SaveTracker.c */
+	{"TDZ3", 1, TRACKER_TAKETRACKER, 3},	/* see XModule SaveTracker.c */
 	{"TDZ4", 1, TRACKER_TAKETRACKER, 4},	/* see XModule SaveTracker.c */
 	{"FA04", 1, TRACKER_DIGITALTRACKER, 4},	/* Atari Falcon */
 	{"FA06", 1, TRACKER_DIGITALTRACKER, 6},	/* Atari Falcon */
 	{"FA08", 1, TRACKER_DIGITALTRACKER, 8},	/* Atari Falcon */
-	{"NSMS", 1, TRACKER_UNKNOWN, 4},	/* in Kingdom.mod */
+	{"NSMS", 1, TRACKER_UNKNOWN, 4},	/* in kingdom.mod */
+	{"LARD", 1, TRACKER_UNKNOWN, 4},	/* in judgement_day_gvine.mod */
 	{"", 0}
 };
 
@@ -124,10 +131,18 @@ static int mod_test(HIO_HANDLE * f, char *t, const int start)
 		return -1;
 	}
 
-	if (!strncmp(buf + 2, "CH", 2) && isdigit((int)buf[0])
+	if (!strncmp(buf + 3, "C", 2) && isdigit((int)buf[0])
 	    && isdigit((int)buf[1])) {
-		i = (buf[0] - '0') * 10 + buf[1] - '0';
-		if (i > 0 && i <= 32) {
+		i = ((buf[0] - '0') * 100) + ((buf[1] - '0') * 10) + (buf[2] - '0');
+		if (i > 0) {
+			goto found;
+		}
+	}
+
+	if ((!strncmp(buf + 2, "CH", 2) || (!strncmp(buf + 2, "CN", 2)) && isdigit((int)buf[0])
+	    && isdigit((int)buf[1])) {
+		i = ((buf[0] - '0') * 10) + (buf[1] - '0');
+		if (i > 0) {
 			goto found;
 		}
 	}
@@ -440,15 +455,24 @@ static int mod_load(struct module_data *m, HIO_HANDLE *f, const int start)
     }
 
     if (mod->chn == 0) {
-	if (!strncmp(magic + 2, "CH", 2) &&
+	if (!strncmp(magic + 3, "C", 1) &&
+	    isdigit((int)magic[0]) && isdigit((int)magic[1]) && isdigit((int)magic[2])) {
+	    mod->chn = ((*magic - '0') * 100) + ((magic[1] - '0') * 10) + (magic[2] - '0');
+	    tracker_id = TRACKER_UNKNOWN;
+	} else if (!strncmp(magic + 2, "CH", 2) &&
 	    isdigit((int)magic[0]) && isdigit((int)magic[1])) {
-	    mod->chn = (*magic - '0') * 10 + magic[1] - '0';
+	    mod->chn = ((*magic - '0') * 10) + (magic[1] - '0');
+	    tracker_id = mod->chn & 1 ? TRACKER_TAKETRACKER : TRACKER_FASTTRACKER2;
+	} else if (!strncmp(magic + 2, "CN", 2) &&
+	    isdigit((int)magic[0]) && isdigit((int)magic[1])) {
+	    mod->chn = ((*magic - '0') * 10) + (magic[1] - '0');
+	    tracker_id = TRACKER_TAKETRACKER;
 	} else if (!strncmp(magic + 1, "CHN", 3) && isdigit((int)*magic)) {
 	    mod->chn = *magic - '0';
+	    tracker_id = mod->chn & 1 ? TRACKER_TAKETRACKER : TRACKER_FASTTRACKER2;
 	} else {
 	    return -1;
 	}
-	tracker_id = mod->chn & 1 ? TRACKER_TAKETRACKER : TRACKER_FASTTRACKER2;
 	detected = 1;
     }
 
