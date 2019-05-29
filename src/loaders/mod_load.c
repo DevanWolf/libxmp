@@ -139,7 +139,7 @@ static int mod_test(HIO_HANDLE * f, char *t, const int start)
 		}
 	}
 
-	if ((!strncmp(buf + 2, "CH", 2) || (!strncmp(buf + 2, "CN", 2)) && isdigit((int)buf[0])
+	if ((!strncmp(buf + 2, "CH", 2) || !strncmp(buf + 2, "CN", 2)) && isdigit((int)buf[0])
 	    && isdigit((int)buf[1])) {
 		i = ((buf[0] - '0') * 10) + (buf[1] - '0');
 		if (i > 0) {
